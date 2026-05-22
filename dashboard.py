@@ -18,7 +18,7 @@ def total_xp_for_level(level):
 def get_level_from_xp(xp):
     level = 0
     while xp >= total_xp_for_level(level+1):
-    level += 1
+        level += 1
         if level > 500: break
     return level
 
