@@ -25,9 +25,10 @@ def get_level_from_xp(xp):
 def get_gid():
     bot = current_app.config.get('BOT')
     if bot and hasattr(bot, 'cached_data'):
-       for key in ['levels','counting','smashkarts','story']:
-          d = bot.cached_data.get(key,{})
-            if d: return list(d.keys())[0]
+        for key in ['levels', 'counting', 'smashkarts', 'story']:
+            d = bot.cached_data.get(key, {})
+            if d:
+                return list(d.keys())[0]
     return None
 
 def resolve_name(uid, lvl_data):
