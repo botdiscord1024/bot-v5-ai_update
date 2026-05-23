@@ -1,5 +1,6 @@
 from flask import Flask, render_template_string, current_app, request, jsonify, redirect, url_for
-import json, os
+import json
+import os
 
 app = Flask(__name__)
 
@@ -10,16 +11,17 @@ def save(f, d):
     json.dump(d, open(f, 'w', encoding='utf-8'), indent=2)
 
 def xp_for_level(level):
-    return 5*(level**2)+50*level+100
+    return 5 * (level ** 2) + 50 * level + 100
 
 def total_xp_for_level(level):
     return sum(xp_for_level(i) for i in range(level))
 
 def get_level_from_xp(xp):
     level = 0
-    while xp >= total_xp_for_level(level+1):
+    while xp >= total_xp_for_level(level + 1):
         level += 1
-        if level > 500: break
+        if level > 500: 
+            break
     return level
 
 def get_gid():
@@ -33,10 +35,12 @@ def get_gid():
 
 def resolve_name(uid, lvl_data):
     bot = current_app.config.get('BOT')
-    if uid in lvl_data and 'name' in lvl_data[uid]:\n        return lvl_data[uid]['name']
+    if uid in lvl_data and 'name' in lvl_data[uid]:
+        return lvl_data[uid]['name']
     if bot:
         user = bot.get_user(int(uid))
-        if user: return user.display_name
+        if user: 
+            return user.display_name
     return f"User {uid}"
 
 def render(route, title, desc, body):
@@ -142,7 +146,7 @@ def levels():
     <option value="disabled" {'selected' if type_opt=='disabled' else ''}>Disabled</option>
     """
     
-    msg_val = cfg.get('levelup_message', "GG {user.mention}! You just leveled up to **Level {level}**!")
+    msg_val = cfg.get('levelup_message', "GG {{user.mention}}! You just leveled up to **Level {{level}}**!")
     ch_val = cfg.get('level_channel', "")
 
     # Load leaderboards
@@ -224,7 +228,8 @@ def api_levels_save():
     cfg.setdefault(gid, {}).update(request.json)
     save('config.json', cfg)
     import builtins
-    if hasattr(builtins, 'refresh_bot_cache'): builtins.refresh_bot_cache()
+    if hasattr(builtins, 'refresh_bot_cache'): 
+        builtins.refresh_bot_cache()
     return jsonify({'ok': True})
 
 # ══════════════════════════════════════════════════════════
@@ -370,7 +375,8 @@ def api_ai_save():
     cfg.setdefault(gid, {}).update(request.json)
     save('config.json', cfg)
     import builtins
-    if hasattr(builtins, 'refresh_bot_cache'): builtins.refresh_bot_cache()
+    if hasattr(builtins, 'refresh_bot_cache'): 
+        builtins.refresh_bot_cache()
     return jsonify({'ok':True})
 
 @app.route('/api/ai/emoji/add', methods=['POST'])
@@ -380,7 +386,8 @@ def api_ai_emoji_add():
     cfg.setdefault(gid, {}).setdefault('custom_external_emojis', {})[request.json['name']] = request.json['url']
     save('config.json', cfg)
     import builtins
-    if hasattr(builtins, 'refresh_bot_cache'): builtins.refresh_bot_cache()
+    if hasattr(builtins, 'refresh_bot_cache'): 
+        builtins.refresh_bot_cache()
     return jsonify({'ok':True})
 
 @app.route('/api/ai/emoji/delete', methods=['POST'])
@@ -391,7 +398,8 @@ def api_ai_emoji_delete():
         cfg[gid]['custom_external_emojis'].pop(request.json['name'], None)
         save('config.json', cfg)
     import builtins
-    if hasattr(builtins, 'refresh_bot_cache'): builtins.refresh_bot_cache()
+    if hasattr(builtins, 'refresh_bot_cache'): 
+        builtins.refresh_bot_cache()
     return jsonify({'ok':True})
 
 # ══════════════════════════════════════════════════════════
@@ -437,4 +445,5 @@ def story():
     return render('story', '📖 Story Adventure Mode', 'Track server generated text simulations and interactive histories', body)
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(debug=True, host='0.0.0.0', port=port)
