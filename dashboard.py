@@ -27,7 +27,8 @@ def get_level_from_xp(xp):
 def get_gid():
     bot = current_app.config.get('BOT')
     if bot and hasattr(bot, 'cached_data'):
-        for key in ['levels', 'counting', 'smashkarts', 'story', 'moderation']:
+        # Модерацията вече е с най-висок приоритет при проверка на Guild ID
+        for key in ['moderation', 'levels', 'counting', 'smashkarts', 'story']:
             d = bot.cached_data.get(key, {})
             if d:
                 return list(d.keys())[0]
@@ -105,10 +106,10 @@ def render(route, title, desc, body):
     <body>
       <div class="sidebar">
         <div class="brand">👑 Admin Panel</div>
+        <a href="/moderation" class="nav-item {% if route=='moderation' %}active{% endif %}">🛡️ Moderation</a>
         <a href="/levels" class="nav-item {% if route=='levels' %}active{% endif %}">⭐ Leveling System</a>
         <a href="/counting" class="nav-item {% if route=='counting' %}active{% endif %}">🔢 Counting Game</a>
         <a href="/ai-settings" class="nav-item {% if route=='ai-settings' %}active{% endif %}">🤖 AI Assistant</a>
-        <a href="/moderation" class="nav-item {% if route=='moderation' %}active{% endif %}">🛡️ Moderation</a>
         <a href="/smashkarts" class="nav-item {% if route=='smashkarts' %}active{% endif %}">🏎️ Smash Karts</a>
         <a href="/story" class="nav-item {% if route=='story' %}active{% endif %}">📖 Story Mode</a>
       </div>
@@ -126,9 +127,81 @@ def render(route, title, desc, body):
     """, route=route, title=title, desc=desc, body=body)
 
 # ══════════════════════════════════════════════════════════
-#  LEVELING PAGE
+#  MODERATION PAGE (НАЧАЛНА СТРАНИЦА)
 # ══════════════════════════════════════════════════════════
 @app.route('/')
+@app.route('/moderation')
+def moderation():
+    gid = get_gid() or 'default'
+    cfg = load('config.json').get(gid, {})
+    
+    automod_on = 'checked' if cfg.get('automod_enabled', False) else ''
+    invite_block_on = 'checked' if cfg.get('block_invites', False) else ''
+    banned_words = cfg.get('banned_words', "")
+    log_channel = cfg.get('log_channel', "")
+    
+    body = f"""
+    <form id="modForm" onsubmit="saveMod(event)">
+    <div class="card">
+      <div class="card-header"><div><h3>Auto-Moderation</h3><p>Configure automated filter rules</p></div></div>
+      <div class="card-body">
+        <div class="toggle-row">
+          <div class="toggle-info"><h4>Enable Word Filter (AutoMod)</h4><p>Scan and delete messages containing blacklisted phrases</p></div>
+          <label class="toggle"><input type="checkbox" id="automod_enabled" {automod_on}> <span class="toggle-slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-info"><h4>Block Server Invites</h4><p>Automatically remove raw Discord server invitation links</p></div>
+          <label class="toggle"><input type="checkbox" id="block_invites" {invite_block_on}> <span class="toggle-slider"></span></label>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><div><h3>Logging & Blacklists</h3><p>Manage system logging channels and terms</p></div></div>
+      <div class="card-body">
+        <div class="field"><label>Mod Log Channel ID</label><input type="text" id="log_channel" value="{log_channel}" placeholder="123456789012345678"></div>
+        <div class="field"><label>Banned Words List (comma separated)</label><textarea id="banned_words" rows="3" placeholder="badword1, badword2, toxic">{banned_words}</textarea></div>
+      </div>
+    </div>
+    <div class="btn-save-row"><button type="submit" class="btn btn-primary">Save Moderation Config</button></div>
+    </form>
+
+    <div id="toast_mod" style="display:none;position:fixed;bottom:24px;right:24px;background:#23a55a;color:#fff;padding:12px 20px;border-radius:6px;font-weight:600;font-size:14px;z-index:9999;">✅ Moderation configs saved successfully!</div>
+
+    <script>
+    function saveMod(e){{
+      e.preventDefault();
+      fetch('/api/moderation/save', {{
+        method: 'POST',
+        headers: {{ 'Content-Type': 'application/json' }},
+        body: JSON.stringify({{
+          automod_enabled: document.getElementById('automod_enabled').checked,
+          block_invites: document.getElementById('block_invites').checked,
+          log_channel: document.getElementById('log_channel').value,
+          banned_words: document.getElementById('banned_words').value
+        }})
+      }}).then(() => {{
+         var t = document.getElementById('toast_mod'); t.style.display='block'; setTimeout(()=>t.style.display='none',2500);
+      }});
+    }}
+    </script>
+    """
+    return render('moderation', '🛡️ Moderation Settings', 'Control automod configurations, blacklisted word definitions, and execution protocols', body)
+
+@app.route('/api/moderation/save', methods=['POST'])
+def api_moderation_save():
+    gid = get_gid() or 'default'
+    cfg = load('config.json')
+    cfg.setdefault(gid, {}).update(request.json)
+    save('config.json', cfg)
+    import builtins
+    if hasattr(builtins, 'refresh_bot_cache'): 
+        builtins.refresh_bot_cache()
+    return jsonify({'ok': True})
+
+# ══════════════════════════════════════════════════════════
+#  LEVELING PAGE
+# ══════════════════════════════════════════════════════════
 @app.route('/levels')
 def levels():
     gid = get_gid() or 'default'
@@ -397,78 +470,6 @@ def api_ai_emoji_delete():
     if hasattr(builtins, 'refresh_bot_cache'): 
         builtins.refresh_bot_cache()
     return jsonify({'ok':True})
-
-# ══════════════════════════════════════════════════════════
-#  MODERATION PAGE
-# ══════════════════════════════════════════════════════════
-@app.route('/moderation')
-def moderation():
-    gid = get_gid() or 'default'
-    cfg = load('config.json').get(gid, {})
-    
-    automod_on = 'checked' if cfg.get('automod_enabled', False) else ''
-    invite_block_on = 'checked' if cfg.get('block_invites', False) else ''
-    banned_words = cfg.get('banned_words', "")
-    log_channel = cfg.get('log_channel', "")
-    
-    body = f"""
-    <form id="modForm" onsubmit="saveMod(event)">
-    <div class="card">
-      <div class="card-header"><div><h3>Auto-Moderation</h3><p>Configure automated filter rules</p></div></div>
-      <div class="card-body">
-        <div class="toggle-row">
-          <div class="toggle-info"><h4>Enable Word Filter (AutoMod)</h4><p>Scan and delete messages containing blacklisted phrases</p></div>
-          <label class="toggle"><input type="checkbox" id="automod_enabled" {automod_on}> <span class="toggle-slider"></span></label>
-        </div>
-        <div class="toggle-row">
-          <div class="toggle-info"><h4>Block Server Invites</h4><p>Automatically remove raw Discord server invitation links</p></div>
-          <label class="toggle"><input type="checkbox" id="block_invites" {invite_block_on}> <span class="toggle-slider"></span></label>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-header"><div><h3>Logging & Blacklists</h3><p>Manage system logging channels and terms</p></div></div>
-      <div class="card-body">
-        <div class="field"><label>Mod Log Channel ID</label><input type="text" id="log_channel" value="{log_channel}" placeholder="123456789012345678"></div>
-        <div class="field"><label>Banned Words List (comma separated)</label><textarea id="banned_words" rows="3" placeholder="badword1, badword2, toxic">{banned_words}</textarea></div>
-      </div>
-    </div>
-    <div class="btn-save-row"><button type="submit" class="btn btn-primary">Save Moderation Config</button></div>
-    </form>
-
-    <div id="toast_mod" style="display:none;position:fixed;bottom:24px;right:24px;background:#23a55a;color:#fff;padding:12px 20px;border-radius:6px;font-weight:600;font-size:14px;z-index:9999;">✅ Moderation configs saved successfully!</div>
-
-    <script>
-    function saveMod(e){{
-      e.preventDefault();
-      fetch('/api/moderation/save', {{
-        method: 'POST',
-        headers: {{ 'Content-Type': 'application/json' }},
-        body: JSON.stringify({{
-          automod_enabled: document.getElementById('automod_enabled').checked,
-          block_invites: document.getElementById('block_invites').checked,
-          log_channel: document.getElementById('log_channel').value,
-          banned_words: document.getElementById('banned_words').value
-        }})
-      }}).then(() => {{
-         var t = document.getElementById('toast_mod'); t.style.display='block'; setTimeout(()=>t.style.display='none',2500);
-      }});
-    }}
-    </script>
-    """
-    return render('moderation', '🛡️ Moderation Settings', 'Control automod configurations, blacklisted word definitions, and execution protocols', body)
-
-@app.route('/api/moderation/save', methods=['POST'])
-def api_moderation_save():
-    gid = get_gid() or 'default'
-    cfg = load('config.json')
-    cfg.setdefault(gid, {}).update(request.json)
-    save('config.json', cfg)
-    import builtins
-    if hasattr(builtins, 'refresh_bot_cache'): 
-        builtins.refresh_bot_cache()
-    return jsonify({'ok': True})
 
 # ══════════════════════════════════════════════════════════
 #  SMASH KARTS PAGE
